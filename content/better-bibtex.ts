@@ -881,6 +881,7 @@ export class BetterBibTeX {
 
     await TeXstudio.init()
 
+    log.debug('Loading Better BibTeX: TeXstudio detection done:', TeXstudio.enabled)
     for (const node of [...this.globals.document.getElementsByClassName('bbt-texstudio')]) {
       node.hidden = !TeXstudio.enabled
     }
@@ -890,6 +891,7 @@ export class BetterBibTeX {
     if (!Preference.citekeyFormat) Preference.citekeyFormat = Preference.default.citekeyFormat
     const citekeyFormat = Preference.citekeyFormat
     if (citekeyFormat.includes('\u200B')) {
+      log.debug('Loading Better BibTeX: first run')
       const params = {
         wrappedJSObject: {
           citekeyFormat: 'bbt',
@@ -919,6 +921,7 @@ export class BetterBibTeX {
         20 // eslint-disable-line no-magic-numbers
       )
     }
+    log.debug('Loading Better BibTeX: start progress meter')
     const progress = new Progress
     progress.start(l10n.localize('BetterBibTeX.startup.waitingForZotero'))
 
