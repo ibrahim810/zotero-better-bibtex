@@ -56,13 +56,13 @@
     else {
       if (options.migrate) {
         const passed = method.parameters.filter(p => p in params)
-        const passed_j = passed.join(',') + ','
-        const all = method.parameters.join(',') + ','
+        const passed_j = ',' + passed.join(',') + ','
+        const all_j = ',' + method.parameters.join(',') + ','
 
         if (!passed.length) {
           args = ''
         }
-        else if (method.parameters.length <= 2 && all.startsWith(passed_j) && passed_j.match(/(^|,)(start|n),/)) {
+        else if (method.parameters.length === 1 || (method.parameters.length === 2 && all_j.startsWith(passed_j) && passed_j.match(/,(start|n),/))) {
           args = passed.map(p => literal(params[p]))
         }
         else {
@@ -105,6 +105,7 @@ pattern
 
 chunk
   = [ \t\r\n]+                            { return '' }
+  / '[]'                                  { return options.migrate ? "''" : '' }
   / '[0]'                                 { return `${options.migrate ? '' : 'this.$'}postfix("-%(n)s")` }
   / '[postfix' start:'+1'? pf:stringparam ']' {
         if (options.migrate && start) {
@@ -127,7 +128,14 @@ chunk
       languages = languages.toLowerCase().split('/').map(language => language.trim())
       return `${options.migrate ? '' : 'this.$'}language(${languages.map(l => literal(l)).join(', ')})`
     }
-  / '[>' min:$[0-9]+ ']'                 { return `${options.migrate ? '' : 'this.$'}len('>',${min})` }
+  / '[>' min:$[0-9]+ ']'                 {
+      if (options.migrate && parseInt(min) === 0) {
+        return 'len'
+      }
+      else {
+        return `${options.migrate ? '' : 'this.$'}len('>',${min})`
+      }
+    }
   / '[' method:method filters:filter* ']' {
       if (options.migrate) {
         return [method].concat(filters).join('.')
@@ -166,12 +174,19 @@ method
         case 'authors':
         case 'editors':
           args.etal = 'EtAl'
+          args.name = typeof args.m === 'number' ? `%(f).${args.m}s` : '%(f)s'
+          delete args.m
           break
 
         // workaround for duplicate-after-lowercase
         case 'auth.etal':
         case 'edtr.etal':
           input = 'authetal2'
+          break
+
+        case 'nopunctordash':
+          input = 'nopunct'
+          args.dash = ''
           break
       }
 
@@ -183,15 +198,18 @@ method
           if (method.parameters.includes('initials')) {
             args.initials = true
           }
+          else if (method.name === '$authors') {
+            args.name += '%(I)s'
+          }
           else {
             error(`unexpected flag '${flag}' on function '${input}'`)
           }
         } else if (flag.length === 1) {
-          if (method.parameters.includes('joiner')) {
-            args.joiner = flag
+          if (method.parameters.includes('sep')) {
+            args.sep = flag
           }
           else {
-            error(`unexpected joiner on function '${input}'`)
+            error(`unexpected sep on function '${input}'`)
           }
         } else if (flag.length) {
           error(`unexpected flag '${flag}' on function '${input}'`)
@@ -208,21 +226,19 @@ method
       return method
     }
   / operator:$([<>=] / [<>!] '=') n:$[0-9]+ {
-    const method = {
-      '=': 'eq',
-      '<': 'lt',
-      '>': 'gt',
-      '<=': 'le',
-      '>=': 'ge',
-      '!=': 'ne',
-    } || operator
+    if (options.migrate && parseInt(n) === 0 && operator === '>') return 'len'
     return match('$len', [operator, n], operator, error)
   }
+  / prop:$([A-Z][a-zA-Z]+) { // before method matching, as method matching is case-insensitive now!
+      const field = options.items.name.field[prop.toLowerCase()]
+      if (!field) error(`Unknown field ${JSON.stringify(prop)}`)
+      return options.migrate ? prop : `this.$getField(${literal(field)})`
+    }
   / name:$([a-z][-.a-zA-Z]+) &{ return get_method(name, '$').name } p:fparams? {
       return match('$' + name, p || [], name, error)
     }
-  / prop:$([a-zA-Z]+) {
-      if (prop.match(/^[a-z]/)) error(`Direct field access ${field} must start with a leading capital`)
+  / prop:$([a-zA-Z]+) { // really just an error catcher now
+      if (prop.match(/^[a-z]/)) error(`Direct field access ${prop} must start with a leading capital`)
       const field = options.items.name.field[prop.toLowerCase()]
       if (!field) error(`Unknown field ${JSON.stringify(prop)}`)
       return options.migrate ? prop : `this.$getField(${literal(field)})`
@@ -238,7 +254,10 @@ flag
 
 filter
   = ':(' dflt:$[^)]+ ')'                  { return `${options.migrate ? '' : '_'}default(${literal(dflt)})` }
-  / ':>' min:$[0-9]+                      { return `${options.migrate ? '' : '_'}len('>', ${min})` }
+  / ':' ('>'/'longer=') min:$[0-9]+       {
+      if (options.migrate && parseInt(min) === 0) return 'len'
+      return `${options.migrate ? '' : '_'}len('>', ${min})`
+    }
   / ':' name:$[-a-z]+ params:stringparam* { return match('_' + name, params, name, error) }
 
 stringparam

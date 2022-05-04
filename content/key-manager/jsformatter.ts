@@ -117,18 +117,47 @@ function upgrade(type) {
   throw { notUpgradable: type } // eslint-disable-line no-throw-literal
 }
 
+function creatorname(_schema, format) {
+  // @ts-ignore
+  creatorname.errors = []
+  let error = ''
+  try {
+    const expected = `${Date.now()}`
+    const vars = { f: expected, g: expected, i: expected, I: expected }
+    const found = sprintf(format, vars)
+    if (found.includes(expected)) return true
+    error = `${format} does not contain ${Object.keys(vars).map(v => `%(${v})s`).join('/')}`
+  }
+  catch (err) {
+    error = err.message
+  }
+
+  // @ts-ignore
+  creatorname.errors.push({
+    keyword: 'creatorname',
+    message: error,
+    params: { keyword: 'creatorname' },
+  })
+  return false
+}
+ajv.addKeyword({
+  keyword: 'creatorname',
+  validate: creatorname,
+})
+
 function postfix(_schema, format) {
   // @ts-ignore
   postfix.errors = []
   let error = ''
   try {
     const expected = `${Date.now()}`
-    const found = sprintf(format, { a: expected, A: expected, n: expected })
+    const vars = { a: expected, A: expected, n: expected }
+    const found = sprintf(format, vars)
     if (!found.includes(expected)) {
-      error = `${format} does not contain %(a)s, %(A)s or %(n)s`
+      error = `${format} does not contain ${Object.keys(vars).map(v => `%(${v})s`).join('/')}`
     }
     else if (found.split(expected).length > 2) {
-      error = `${format} contains multiple instances of %(a)s/%(A)s/%(n)s`
+      error = `${format} contains multiple instances of ${Object.keys(vars).map(v => `%(${v})s`).join('/')}`
     }
     else {
       return true
@@ -146,7 +175,6 @@ function postfix(_schema, format) {
   })
   return false
 }
-
 ajv.addKeyword({
   keyword: 'postfix',
   validate: postfix,
@@ -164,6 +192,10 @@ for (const meta of Object.values(api)) {
       // @ts-ignore
       meta.schema.properties[property].properties.value = { postfix: true }
     }
+    else if (meta.name === '$authors' && property === 'name') {
+      // @ts-ignore
+      meta.schema.properties[property].properties.value = { creatorname: true }
+    }
   }
 }
 
@@ -179,6 +211,8 @@ for (const fname in api) {
 type Context = { arguments?: boolean, coerce?: boolean }
 export class PatternParser {
   public code: string
+  public warning = ''
+
   private patterns: AST
   private ftype: string
 
@@ -324,6 +358,10 @@ export class PatternParser {
 
   protected AssignmentExpression(expr: AST, context: Context): AST {
     if (!context.arguments) this.error(expr)
+    if (expr.left.name === 'joiner' || expr.left.name === 'join') {
+      this.warning = `please use "sep" instead of "${expr.left.name}"`
+      expr.left.name = 'sep'
+    }
     return {...this.convert(expr.right, context), named_argument: expr.left.name}
   }
 

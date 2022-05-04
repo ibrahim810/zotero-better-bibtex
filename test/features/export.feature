@@ -13,6 +13,7 @@ Feature: Export
 
     Examples:
       | file                                                                                                                     | references |
+      | Zotero's Manuscript 'Type' is mapped to both biblatex's 'type' and 'howpublished' #2114                                  | 1          |
       | Configurable journal abbreviation for citekey #2097                                                                      | 1          |
       | BetterBibLaTeX exports articles as online #2058                                                                          | 3          |
       | How to export bib without month and date in year item (Using better bibtex) #2022                                        | 1          |
@@ -441,6 +442,12 @@ Feature: Export
     Then an export using "Better BibTeX" should match "export/*.bibtex"
 
   @postscript @bbt
+  Scenario: Custom field ordering -- dependent on order entry in Extra rather than static #2082
+    Given I import 1 reference from "export/*.json"
+    And I set preference .postscript to "export/*.js"
+    Then an export using "Better BibLaTeX" should match "export/*.biblatex"
+
+  @postscript @bbt
   Scenario: Transforming exported file names (windows path conversion) #1939
     Given I import 1 reference from "export/*.json"
     And I set preference .postscript to "export/*.js"
@@ -525,6 +532,7 @@ Feature: Export
   Scenario: (non-)dropping particle handling #313
     When I import 53 references from "export/*.json"
     Then an export using "Better BibLaTeX" should match "export/*.biblatex"
+    And an export using "Better BibLaTeX" with cacheUse on should match "export/*-cached.biblatex"
 
   @1420
   Scenario: (non-)dropping particle handling #313
@@ -550,7 +558,7 @@ Feature: Export
     And I reset the cache
     Then an export using "Better BibTeX" should match "export/*.bibtex"
     Then an export using "Better BibTeX" with cacheUse on should match "export/*-cached.bibtex"
-    When I set preference .caching to false
+    When I set preference .cache to false
     Then an export using "Better BibTeX" with cacheUse on should match "export/*-uncached.bibtex"
 
   # tests without cache prefill
@@ -558,7 +566,7 @@ Feature: Export
   Scenario: Really Big whopping library
     When I restart Zotero with "1287" + "export/*.json"
     And I reset the cache
-    And I set preference .caching to false
+    And I set preference .cache to false
     Then an export using "Better BibTeX" should match "export/*.bibtex"
 
   # tests the cache for CSL
@@ -582,6 +590,7 @@ Feature: Export
   # And I wait 5 seconds
   # And I wait at most 100 seconds until all auto-exports are done
   # Then "/tmp/autoexport.bib" should match "export/*.bibtex"
+
   @1495
   Scenario: use author dash separation rather than camel casing in citekey #1495
     Given I import 1 reference from "export/*.json"

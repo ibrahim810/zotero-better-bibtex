@@ -13,6 +13,7 @@ import { AutoExport } from './auto-export'
 import { Translators } from './translators'
 import { client } from './client'
 import * as l10n from './l10n'
+import { Events } from './events'
 
 const namespace = 'http://retorque.re/zotero-better-bibtex/'
 
@@ -30,6 +31,10 @@ class AutoExportPane {
     }
 
     this.refresh()
+
+    Events.on('export-progress', (percent: number, _translator, ae: number) => {
+      if (percent >= 100) this.refreshCacheRate(ae).catch(err => log.error('failed to refresh cacherate for completed auto-export', ae, err))
+    })
   }
 
   public refresh() {
@@ -172,16 +177,26 @@ class AutoExportPane {
     this.refresh()
   }
 
-  public async refreshCacheRate(node) {
-    try {
-      const $loki = parseInt(node.getAttributeNS(namespace, 'ae-id'))
-      this.cacherate[$loki] = await AutoExport.cached($loki)
-      this.refresh()
+  public async refreshCacheRate(ae: Element | number) {
+    log.debug('getting cacherate for', typeof ae)
+    if (typeof ae !== 'number') ae = parseInt(ae.getAttributeNS(namespace, 'ae-id'))
+    log.debug('getting cacherate for', typeof ae)
+
+    if (typeof ae !== 'number') {
+      log.debug('refresh cacherate on unknown ae?', typeof ae)
     }
-    catch (err) {
-      log.error('could not refresh cacherate:', err)
-      this.cacherate = {}
+    else {
+      try {
+        log.debug('getting cacherate for', { ae })
+        this.cacherate[ae] = await AutoExport.cached(ae)
+        log.debug('refresh cacherate:', ae, '=', this.cacherate[ae])
+      }
+      catch (err) {
+        log.error('could not refresh cacherate for', ae, err)
+        delete this.cacherate[ae]
+      }
     }
+    this.refresh()
   }
 
   public edit(node) {
@@ -260,21 +275,25 @@ export class PrefPane {
     if (target) this.keyformat = target
     if (!this.keyformat || Zotero.BetterBibTeX.ready.isPending()) return // itemTypes not available yet
 
-    let msg
+    let msg = '', color = ''
     try {
       Formatter.parsePattern(this.keyformat.value)
-      msg = ''
+      if (Formatter.warning) {
+        msg = Formatter.warning
+        color = 'yellow'
+      }
       if (this.keyformat.value) this.saveCitekeyFormat(target)
     }
     catch (err) {
       msg = err.message
+      color = 'DarkOrange'
       if (err.location) msg += ` at ${(err.location.start.offset as number) + 1}`
       log.error('prefs: key format error:', msg)
     }
 
     if (!this.keyformat.value && !msg) msg = 'pattern is empty'
 
-    this.keyformat.setAttribute('style', (msg ? '-moz-appearance: none !important; background-color: DarkOrange' : ''))
+    this.keyformat.setAttribute('style', (msg ? `-moz-appearance: none !important; background-color: ${color}` : ''))
     this.keyformat.setAttribute('tooltiptext', msg)
   }
 
