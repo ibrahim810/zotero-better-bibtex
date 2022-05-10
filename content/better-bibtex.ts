@@ -920,6 +920,13 @@ export class BetterBibTeX {
 
     log.debug('Loading Better BibTeX: starting...')
 
+    log.debug('Loading Better BibTeX: start progress meter')
+    const progress = new Progress
+    progress.start(l10n.localize('BetterBibTeX.startup.waitingForZotero'))
+
+    // https://groups.google.com/d/msg/zotero-dev/QYNGxqTSpaQ/uvGObVNlCgAJ
+    await Zotero.Schema.schemaUpdatePromise
+
     await TeXstudio.init()
 
     log.debug('Loading Better BibTeX: TeXstudio detection done:', TeXstudio.enabled)
@@ -962,12 +969,6 @@ export class BetterBibTeX {
         20 // eslint-disable-line no-magic-numbers
       )
     }
-    log.debug('Loading Better BibTeX: start progress meter')
-    const progress = new Progress
-    progress.start(l10n.localize('BetterBibTeX.startup.waitingForZotero'))
-
-    // https://groups.google.com/d/msg/zotero-dev/QYNGxqTSpaQ/uvGObVNlCgAJ
-    await Zotero.Schema.schemaUpdatePromise
 
     this.dir = OS.Path.join(Zotero.DataDirectory.dir, 'better-bibtex')
     await OS.File.makeDir(this.dir, { ignoreExisting: true })
