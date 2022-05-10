@@ -68,19 +68,23 @@ const casing = {
 }
 
 export function get(extra: string, mode: 'zotero' | 'csl', options?: GetOptions): { extra: string, extraFields: Fields } {
-  if (!options) options = { citationKey: true , aliases: true, kv: true, tex: true }
+  let defaults = false
+  if (!options) {
+    options = { citationKey: true , aliases: true, kv: true, tex: true }
+    defaults = true
+  }
 
   const other = {zotero: 'csl', csl: 'zotero'}[mode]
 
   extra = extra || ''
 
   const extraFields: Fields = {
-    kv: {},
+    kv: options.kv || defaults ? {} : undefined,
     creator: {},
     creators: [],
-    tex: {},
+    tex: options.tex || defaults ? {} : undefined,
     citationKey: '',
-    aliases: [],
+    aliases: options.aliases || defaults ? [] : undefined,
   }
 
   let ef
@@ -115,7 +119,7 @@ export function get(extra: string, mode: 'zotero' | 'csl', options?: GetOptions)
       return false
     }
 
-    if (options.kv && (ef = mapping[key]) && !tex) {
+    if (options.kv && key !== 'citation key' && (ef = mapping[key]) && !tex) {
       for (const field of (ef[mode] || ef[other])) {
         switch (ef.type) {
           case 'name':
