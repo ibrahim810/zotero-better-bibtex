@@ -1,5 +1,6 @@
 import { patch as $patch$ } from './monkey-patch'
 import { sentenceCase } from './text'
+import { log } from './logger'
 
 async function title_sentenceCase(label) {
   const val = this._getFieldValue(label)
