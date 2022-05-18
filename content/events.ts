@@ -21,11 +21,12 @@ const event_prefix = events.map(name => name + '.')
 const log_events = Zotero.Prefs.get('translators.better-bibtex.log-events')
 
 export const Events = new class EventEmitter extends EventEmitter3 {
+  private active = false
+
   constructor() {
     super()
-    this.on('error', err => {
-      throw Zotero.debug(err)
-    })
+    this.active = true
+    this.on('error', err => { log.error(err) })
   }
 
   private verify(event: string | symbol) {
@@ -42,6 +43,8 @@ export const Events = new class EventEmitter extends EventEmitter3 {
   }
 
   public emit(event: string | symbol, ...args: any[]): boolean {
+    if (!this.active) return false
+
     this.verify(event)
 
     const prefix: string = typeof event === 'string' ? event + '.' : '\0'
@@ -51,6 +54,14 @@ export const Events = new class EventEmitter extends EventEmitter3 {
       if (listening === event || (typeof listening === 'string' && listening.startsWith(prefix))) results.push(super.emit.apply(this, [listening, ...args]))
     }
     return results.length === 0 ? false : !results.find(r => !r)
+  }
+
+  public clear(options: { context?: any, event?: any } = {}) {
+    for (const event of options.event ? [ options.event ] : this.eventNames()) {
+      for (const listener of this.listeners(event)) {
+        this.removeListener(event, listener, options.context)
+      }
+    }
   }
 
   public itemsChanged(items: ZoteroItem[]): void {
