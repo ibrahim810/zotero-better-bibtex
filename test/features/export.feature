@@ -13,7 +13,8 @@ Feature: Export
 
     Examples:
       | file                                                                                                                     | references |
-      | Make DOMParser available in background export #2094                                                                      | 1          |
+      | Citation key add `_preprint` if URL contains `arxiv.org` #2163                                                           | 12         |
+      | Make DOMParser available in background export #2094                                                                      | 2          |
       | Authors export looks like this prefix=von useprefix=true... #2138                                                        | 1          |
       | Zotero's Manuscript 'Type' is mapped to both biblatex's 'type' and 'howpublished' #2114                                  | 1          |
       | Configurable journal abbreviation for citekey #2097                                                                      | 1          |
@@ -453,8 +454,15 @@ Feature: Export
   Scenario: Transforming exported file names (windows path conversion) #1939
     Given I import 1 reference from "export/*.json"
     And I set preference .postscript to "export/*.js"
-    And I set preference .workers to 0
+    And I set preference .worker to false
     Then an export using "Better BibTeX" should match "export/*.bibtex"
+
+  Scenario: Make DOMParser available in background export #2094
+    Given I import 4 references from "export/*.json"
+    And I set preference .worker to false
+    Then an export using "Better BibLaTeX" should match "export/*.biblatex"
+    When I set preference .worker to true
+    Then an export using "Better BibLaTeX" should match "export/*.biblatex"
 
   @postscript @1043
   Scenario: Unbalanced vphantom escapes #1043
@@ -539,7 +547,7 @@ Feature: Export
   @1420
   Scenario: (non-)dropping particle handling #313
     When I import 53 references from "export/*.json"
-    And I set preference .workers to 0
+    And I set preference .worker to false
     Then an export using "Better BibLaTeX" should match "export/*.biblatex"
 
   @1270

@@ -1,19 +1,21 @@
-// workerContext and Translator must be var-hoisted by esbuild to make this work
-declare const ZOTERO_TRANSLATOR_INFO: any
-declare const workerContext: { translator: string, debugEnabled: boolean, worker: string }
+import type { Translators as Translator } from '../typings/translators'
+// workerJob and Translator must be var-hoisted by esbuild to make this work
+declare var ZOTERO_TRANSLATOR_INFO: TranslatorHeader // eslint-disable-line no-var
+declare const workerJob: Translator.Worker.Job
 
 import { asciify } from './stringify'
 import { environment } from './environment'
 import jsesc from 'jsesc'
 
-const inTranslator = environment.worker || typeof ZOTERO_TRANSLATOR_INFO !== 'undefined'
+import type { TranslatorHeader } from '../translators/lib/translator'
 
 class Logger {
   public verbose = false
 
   protected timestamp: number
 
-  private format({ error=false, worker='', translator='', issue=0}, msg) {
+  private format({ error=false, worker=0, translator='', issue=0}, msg) {
+    let workername = `${worker}`
     let diff = null
     const now = Date.now()
     if (this.timestamp) diff = now - this.timestamp
@@ -44,16 +46,19 @@ class Logger {
       msg = output
     }
 
-    if (environment.worker) {
-      worker = worker || workerContext.worker
-      translator = translator || workerContext.translator
+    if (Zotero.worker) {
+      if (!worker && workerJob.job) {
+        worker = workerJob.job
+        workername = `${workerJob.job}`
+      }
+      translator = translator || workerJob.translator
     }
     else {
-      if (worker) worker = `${worker} (but environment is ${environment.name})`
+      if (worker) workername = `${worker} (but environment is ${environment.name})`
       // Translator must be var-hoisted by esbuild for this to work
-      if (!translator && inTranslator) translator = ZOTERO_TRANSLATOR_INFO.label
+      if (!translator && typeof ZOTERO_TRANSLATOR_INFO !== 'undefined') translator = ZOTERO_TRANSLATOR_INFO.label
     }
-    const prefix = ['better-bibtex', translator, error && ':error:', worker && `(worker ${worker})`].filter(p => p).join(' ')
+    const prefix = ['better-bibtex', translator, error && ':error:', worker && `(worker ${workername})`].filter(p => p).join(' ')
     return `{${prefix}} +${diff} ${asciify(msg)}`
   }
 
@@ -70,9 +75,9 @@ class Logger {
   }
 
   public get enabled(): boolean {
-    if (!inTranslator) return Zotero.Debug.enabled as boolean
-    if (!environment.worker) return true
-    return !workerContext || workerContext.debugEnabled
+    if (typeof ZOTERO_TRANSLATOR_INFO === 'undefined') return Zotero.Debug.enabled as boolean
+    if (!Zotero.worker) return true
+    return !workerJob || workerJob.debugEnabled
   }
 
   public debug(...msg) {
@@ -86,7 +91,7 @@ class Logger {
   public error(...msg) {
     Zotero.debug(this.format({error: true}, msg))
   }
-  public status({ error=false, worker='', translator='' }, ...msg) {
+  public status({ error=false, worker=0, translator='' }, ...msg) {
     if (error || this.enabled) Zotero.debug(this.format({error, worker, translator}, msg))
   }
 }
